@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>User Control Panel</title>
+
+<style>
+body {
+    background:#050b14;
+    color:white;
+    font-family:Arial, sans-serif;
+    padding:20px;
+    user-select:none;
+}
+
+h1 {
+    text-align:center;
+    margin-bottom:20px;
+    background:linear-gradient(to right,#0066d4,#fff);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+}
+
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+th, td {
+    padding:10px;
+    border:1px solid #0066d4;
+    text-align:center;
+}
+
+button {
+    padding:6px 10px;
+    border:none;
+    border-radius:6px;
+    background:#0066d4;
+    color:white;
+    cursor:pointer;
+    margin:2px;
+}
+
+button:hover {
+    background:#1aa3ff;
+}
+</style>
+</head>
+
+<body oncontextmenu="return false">
+
+<h1>User Management Panel</h1>
+
+<table>
+<thead>
+<tr>
+    <th>Username</th>
+    <th>Password</th>
+    <th>Status</th>
+    <th>Timeout Until</th>
+    <th>Actions</th>
+</tr>
+</thead>
+<tbody id="userTable"></tbody>
+</table>
+
+<script>
+// Disable devtools (basic)
+document.addEventListener("keydown", e => {
+    if (
+        e.keyCode === 123 ||
+        (e.ctrlKey && e.shiftKey && ["I","C","J"].includes(e.key.toUpperCase())) ||
+        (e.ctrlKey && ["U","S"].includes(e.key.toUpperCase()))
+    ) {
+        e.preventDefault();
+        return false;
+    }
+});
+
+// Load users
+function loadUsers() {
+    const users = JSON.parse(localStorage.getItem("users") || "[]");
+    const tbody = document.getElementById("userTable");
+    tbody.innerHTML = "";
+
+    users.forEach(u => {
+        const timeout = u.timeoutUntil
+            ? new Date(u.timeoutUntil).toLocaleString()
+            : "-";
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${u.username}</td>
+            <td>${u.password}</td>
+            <td>${u.status}</td>
+            <td>${timeout}</td>
+            <td>
+                <button onclick="toggleDisable('${u.username}')">
+                    ${u.status === "disabled" ? "Enable" : "Disable"}
+                </button>
+                <button onclick="banUser('${u.username}', 60)">Ban 1h</button>
+                <button onclick="banUser('${u.username}', 4320)">Ban 3d</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Enable / Disable
+function toggleDisable(username) {
+    let users = JSON.parse(localStorage.getItem("users") || "[]");
+    users = users.map(u =>
+        u.username === username
+            ? { ...u, status: u.status === "disabled" ? "active" : "disabled" }
+            : u
+    );
+    localStorage.setItem("users", JSON.stringify(users));
+    loadUsers();
+}
+
+// Ban with timer
+function banUser(username, minutes) {
+    let users = JSON.parse(localStorage.getItem("users") || "[]");
+    const timeoutUntil = Date.now() + minutes * 60000;
+
+    users = users.map(u =>
+        u.username === username
+            ? { ...u, status: "banned", timeoutUntil }
+            : u
+    );
+
+    localStorage.setItem("users", JSON.stringify(users));
+    loadUsers();
+}
+
+// Auto-unban expired users
+setInterval(() => {
+    let users = JSON.parse(localStorage.getItem("users") || "[]");
+    let changed = false;
+
+    users = users.map(u => {
+        if (u.status === "banned" && u.timeoutUntil && Date.now() > u.timeoutUntil) {
+            changed = true;
+            return { ...u, status: "active", timeoutUntil: null };
+        }
+        return u;
+    });
+
+    if (changed) {
+        localStorage.setItem("users", JSON.stringify(users));
+        loadUsers();
+    }
+}, 5000);
+
+loadUsers();
+</script>
+
+</body>
+</html>
